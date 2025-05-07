@@ -2,67 +2,125 @@
 
 import type React from "react"
 
-import { useState, useRef, type KeyboardEvent } from "react"
-import { Button } from "./ui/button"
-import { Textarea } from "./ui/textarea"
-import { SendIcon } from "lucide-react"
+import { useState, useRef } from "react"
+import { Send, Upload, Loader2, X } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Textarea } from "@/components/ui/textarea"
+import { useToast } from "@/components/ui/use-toast"
 
 interface ChatInputProps {
-  onSendMessage: (message: string) => void
-  isDisabled?: boolean
+  onSubmit: (input: string, file?: File) => Promise<void>
+  loading: boolean
 }
 
-export function ChatInput({ onSendMessage, isDisabled = false }: ChatInputProps) {
-  const [message, setMessage] = useState("")
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
+export function ChatInput({ onSubmit, loading }: ChatInputProps) {
+  const [input, setInput] = useState("")
+  const [file, setFile] = useState<File | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const { toast } = useToast()
 
-  const handleSubmit = () => {
-    if (message.trim() && !isDisabled) {
-      onSendMessage(message)
-      setMessage("")
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0]
+    if (!selectedFile) return
 
-      // Reset textarea height
-      if (textareaRef.current) {
-        textareaRef.current.style.height = "auto"
-      }
+    const allowedTypes = [
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", // xlsx
+      "application/pdf", // pdf
+      "image/jpeg", // jpg
+      "image/png", // png
+    ]
+
+    if (!allowedTypes.includes(selectedFile.type)) {
+      toast({
+        title: "Unsupported file",
+        description: "Please upload .xlsx, .pdf, .jpg or .png files",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setFile(selectedFile)
+    toast({
+      title: "File selected",
+      description: selectedFile.name,
+    })
+  }
+
+  const handleSubmit = async () => {
+    if (!input.trim() && !file) {
+      toast({
+        title: "Empty input",
+        description: "Please type a product or upload a file",
+        variant: "destructive",
+      })
+      return
+    }
+
+    await onSubmit(input, file || undefined)
+    setInput("")
+    setFile(null)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ""
     }
   }
 
-  const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault()
       handleSubmit()
     }
   }
 
-  const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setMessage(e.target.value)
-
-    // Auto-resize textarea
-    const textarea = e.target
-    textarea.style.height = "auto"
-    textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`
+  const removeFile = () => {
+    setFile(null)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ""
+    }
   }
 
   return (
-    <div className="relative flex items-end space-x-2">
+    <div className="relative">
       <Textarea
-        ref={textareaRef}
-        value={message}
-        onChange={handleTextareaChange}
+        placeholder="Type product names separated by commas or line breaks..."
+        value={input}
+        onChange={(e) => setInput(e.target.value)}
         onKeyDown={handleKeyDown}
-        placeholder="Digite sua mensagem ou cole sua lista de produtos, um por linha..."
-        className="resize-none min-h-[60px] max-h-[200px] pr-12 rounded-md border border-input bg-background"
-        disabled={isDisabled}
+        className="min-h-[120px] pr-24"
+        disabled={loading}
       />
-      <Button
-        size="icon"
-        className="absolute right-2 bottom-2 h-8 w-8 rounded-full"
-        onClick={handleSubmit}
-        disabled={!message.trim() || isDisabled}
-      >
-        <SendIcon className="h-4 w-4" />
-      </Button>
+      <div className="absolute bottom-3 right-3 flex space-x-2">
+        <input
+          type="file"
+          ref={fileInputRef}
+          onChange={handleFileChange}
+          className="hidden"
+          accept=".xlsx,.pdf,.jpg,.jpeg,.png"
+          disabled={loading}
+        />
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={loading}
+          title="Upload file"
+        >
+          <Upload className="h-4 w-4" />
+        </Button>
+        <Button onClick={handleSubmit} disabled={loading} title="Send">
+          {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Send className="h-4 w-4 mr-2" />}
+          {loading ? "Processing..." : "Send"}
+        </Button>
+      </div>
+      {file && (
+        <div className="mt-2 text-sm text-gray-500 flex items-center">
+          <span className="font-medium">File:</span>
+          <span className="ml-2">{file.name}</span>
+          <Button variant="ghost" size="sm" className="ml-2 h-6 px-2" onClick={removeFile} disabled={loading}>
+            <X className="h-3 w-3 mr-1" />
+            Remove
+          </Button>
+        </div>
+      )}
     </div>
   )
 }
