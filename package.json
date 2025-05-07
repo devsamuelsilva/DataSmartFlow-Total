@@ -59,7 +59,8 @@
     "vaul": "^0.9.6",
     "zod": "^3.24.1",
     "exceljs": "latest",
-    "@supabase/supabase-js": "latest"
+    "@supabase/supabase-js": "latest",
+    "child_process": "latest"
   },
   "devDependencies": {
     "@types/node": "^22",
